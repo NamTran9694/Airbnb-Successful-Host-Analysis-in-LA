@@ -1,0 +1,129 @@
+---
+title: "Dec_Feature_Engineer"
+author: "Nam Tran"
+date: "3/23/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr); library(tidyverse); library(dplyr); library(psych); library(PerformanceAnalytics); library(skimr); library(lessR); library(ggplot2); library(gridExtra); library(fastDummies); library(forecast); library(BMA); library(stats); library(olsrr); library(MASS); library(kableExtra); library(car); library(broom); library(glmulti); library(ggmap); library(rstudioapi); library(revgeo); library(RCurl);library(stringr); library(gsubfn) 
+```
+
+```{r}
+Listing_Dec<- read.csv("Airbnb_DataCleaning1.csv")
+dim(Listing_Dec)
+```
+
+## Cleaning Data
+
+### How many missing value for each variable?
+
+```{r}
+as.data.frame(colSums(is.na(Listing_Dec)))
+```
+
+### How many listings with 0.0 of price ?
+```{r}
+count(Listing_Dec[Listing_Dec$price == 0,])
+Listing_Dec_Clean1 <- Listing_Dec[!(Listing_Dec$price == 0),]
+Listing_Dec_Clean1 <- Listing_Dec_Clean1[!is.na(Listing_Dec_Clean1$price),]
+dim(Listing_Dec_Clean1)
+```
+
+
+
+### How many listings have no beds
+```{r}
+count(Listing_Dec[Listing_Dec$beds == 0,])
+```
+There are 1810 listings that have no information about number of beds, these missing value will be replaced by the mean of this variable grouped by type of the room.
+```{r}
+pivot(data = Listing_Dec, compute = median, variable = beds, by = room_type )
+```
+```{r}
+Listing_Dec_Clean1$beds[is.na(Listing_Dec_Clean1$beds) & Listing_Dec_Clean1$room_type =="Entire home/apt"] = 2
+Listing_Dec_Clean1$beds[is.na(Listing_Dec_Clean1$beds) & Listing_Dec_Clean1$room_type =="Hotel room"] = 1
+Listing_Dec_Clean1$beds[is.na(Listing_Dec_Clean1$beds) & Listing_Dec_Clean1$room_type =="Private room"] = 1
+Listing_Dec_Clean1$beds[is.na(Listing_Dec_Clean1$beds) & Listing_Dec_Clean1$room_type =="Shared room"] = 1
+#count(Listing_Dec_Clean1[Listing_Dec_Clean1$beds == 0,])
+```
+
+```{r}
+Listing_Dec_Clean2 <- Listing_Dec_Clean1
+```
+
+### Create a new data called "Hosts"
+Each listing has an unique id, but host_id is repeated multiple times because there are hosts who own more than one listing. Therefore, I create a new data frame to store host information and examine hosts easier.
+```{r}
+Hosts <- Listing_Dec_Clean2[!duplicated(Listing_Dec_Clean2$host_id),]
+
+```
+
+### Calculate the average price of host
+```{r}
+Host_Avg_price <- as.data.frame(pivot(data = Listing_Dec_Clean2, compute = mean, variable = price, by = host_id ))
+
+```
+```{r}
+Hosts <- Merge(Hosts,Host_Avg_price[,c("price_mean","host_id")], by = "host_id")
+```
+
+### Calculate the Total of review of host
+```{r}
+Host_total_Review <- as.data.frame(pivot(data = Listing_Dec_Clean2, compute = sum, variable = number_of_reviews, by = host_id))
+Hosts <- Merge(Hosts,Host_total_Review[,c("number_of_reviews_sum","host_id")], by = "host_id")
+```
+
+### Calculate the total of review ltm of host
+```{r}
+Host_total_ltm_Review <- as.data.frame(pivot(data = Listing_Dec_Clean2, compute = sum, variable = number_of_reviews_ltm, by = host_id))
+Hosts <- Merge(Hosts,Host_total_ltm_Review[,c("number_of_reviews_ltm_sum","host_id")], by = "host_id")
+```
+
+### Calculate the total of review l30d of host
+```{r}
+Host_total_l30d_Review <- as.data.frame(pivot(data = Listing_Dec_Clean2, compute = sum, variable = number_of_reviews_l30d, by = host_id))
+Hosts <- Merge(Hosts,Host_total_l30d_Review[,c("number_of_reviews_l30d_sum","host_id")], by = "host_id")
+```
+
+### Calculate the average review score of host
+```{r}
+Host_Avg_Score_Review <- as.data.frame(pivot(data = Listing_Dec_Clean2, compute = mean, variable = c(32,33,34,35,36,37,38), by = host_id))
+```
+```{r}
+Hosts <- Merge(Hosts,Host_Avg_Score_Review[,c(1,4,7,10,13,16,19,22)], by = "host_id")
+```
+
+### Calculate the average review per month of host
+```{r}
+Host_Avg_Review <- as.data.frame(pivot(data = Listing_Dec_Clean2, compute = mean, variable = reviews_per_month, by = host_id))
+Hosts <- Merge(Hosts,Host_Avg_Review[,c(1,4)], by = "host_id")
+```
+
+```{r}
+Hosts_drop <- c("id","name","description","neighborhood_overview","host_total_listings_count","neighbourhood","neighbourhood_cleansed",
+                "neighbourhood_group_cleansed","latitude","longitude","property_type","room_type","accommodates","bathrooms_text",
+                "bedrooms","beds","amenities","first_review ","last_review","instant_bookable","City","State","Zip",
+                "calculated_host_listings_count","calculated_host_listings_count_entire_homes","calculated_host_listings_count_private_rooms",
+                "calculated_host_listings_count_shared_rooms")
+Hosts_df <- Hosts[,!names(Hosts) %in% Hosts_drop]
+```
+
+### Calculate Total Listing of a Host
+```{r}
+Host_Total_Listing <- as.data.frame(table(Listing_Dec_Clean2$host_id))
+colnames(Host_Total_Listing) <- c("host_id","total_listing")
+Hosts_df <- Merge(Hosts_df,Host_Total_Listing, by = "host_id")
+```
+
+### Calculate how long the host was joining Airbnb until Dec 06 2021
+```{r}
+#Hosts_df$Host_time <- as.Date("2021-12-06") - Hosts_df$host_since
+```
+
+```{r}
+write.csv(Hosts_df,"Hosts_information.csv", row.names = FALSE)
+write.csv(Listing_Dec_Clean2,"Airbnb_DataCleaning2.csv", row.names = FALSE)
+```
+
