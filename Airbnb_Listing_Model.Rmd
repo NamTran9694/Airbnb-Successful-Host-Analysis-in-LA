@@ -1,0 +1,184 @@
+---
+title: "Model_1"
+author: "Nam Tran"
+date: "3/31/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr); library(tidyverse); library(dplyr); library(psych); library(PerformanceAnalytics); library(skimr); library(lessR); library(ggplot2); library(gridExtra); library(fastDummies); library(forecast); library(BMA); library(stats); library(olsrr); library(MASS); library(kableExtra); library(car); library(broom); library(glmulti); library(ggmap); library(rstudioapi); library(revgeo); library(RCurl);library(stringr); library(gsubfn);library(ngram);library(stringr); library(tm); library(caret); library(ROCR); library(ROSE); library(gains)
+```
+
+```{r}
+df <- read.csv("Airbnb_DataCleaning3.csv")
+```
+
+```{r}
+str(df)
+```
+
+```{r}
+num_val <- c("host.response.rate", "host.acceptance.rate", "host.total.listings.count", "accommodates", "bedrooms", "beds", "price", "number.of.reviews",
+             "number.of.reviews.ltm", "review.scores.rating", "review.scores.accuracy", "review.scores.cleanliness", "review.scores.checkin", "review.scores.communication",
+             "review.scores.location", "review.scores.value", "reviews.per.month", "amenities.count", "Med.Area.House.Value","Percen.Under.Poverty")
+cate_val <- c("host.response.time", "host.is.superhost", "host.has.profile.pic", "host.identity.verified", "room.type", "instant.bookable",
+              "Density.Bin","Bathroom.Type")
+dummy_val <- c("air.conditioning", "high.end.electronics", "bbq", "balcony", "breakfast", "tv", "coffee.machine", "kitchen", "white.goods", "gym", "parking", 
+               "outdoor.space", "hottub.sauna.pool", "internet", "long.term.Stay.allowed", "private.entrance", "secure")
+length(num_val)
+length(cate_val)
+length(dummy_val)
+```
+
+### Create Dummy Variables for Categorical Variables
+```{r}
+df <- fastDummies::dummy_cols(df, select_columns = cate_val, remove_first_dummy = TRUE)
+```
+
+```{r}
+Unselect_val <- c("X", "host.id", "name", "description", "neighborhood.overview", "neighbourhood.cleansed", "neighbourhood.group.cleansed",
+                  "City", "State", "Zip","bathrooms.text" ,cate_val)
+model_df <- df[,!colnames(df) %in% Unselect_val]
+model_df
+```
+
+```{r}
+colnames(model_df)
+```
+
+
+
+### Interaction of Price and Room type
+```{r}
+model_df$PriceXhotelType <- model_df$price*model_df$`room.type_Hotel room`
+model_df$PriceXprivateType <- model_df$price*model_df$`room.type_Private room`
+model_df$PriceXsharedType <- model_df$price*model_df$`room.type_Shared room`
+
+```
+
+### NORMALIZE NUMERICAL VARIABLE
+```{r}
+model_df[,num_val] <- scale(model_df[,num_val])
+```
+
+```{r}
+model_df <- model_df[!is.na(model_df$Med.Area.House.Value),]
+model_df <- model_df[!is.na(model_df$Percen.Under.Poverty),]
+as.data.frame(colSums(is.na(model_df)))
+dim(model_df)
+```
+
+```{r}
+Unselect_val <- c("X", "host.id", "name", "description", "neighborhood.overview", "neighbourhood.cleansed", "neighbourhood.group.cleansed",
+                  "City", "State", "Zip","bathrooms.text", "beds", "review.scores.accuracy", "review.scores.cleanliness", "review.scores.checkin",
+                  "review.scores.communication", "reviews.per.month", "number.of.reviews", "host.response.rate", "review.scores.rating", "review.scores.value", "host.response.time", cate_val, "host.response.time_within a day", "host.response.time_within a few hours", "host.response.time_within an hour")
+model_df <- model_df[,!colnames(model_df) %in% Unselect_val]
+```
+
+### Change Colnames
+```{r}
+colnames(model_df)
+```
+
+
+```{r}
+#colnames(model_df)[32] <- "host.response.time_within_a_day"
+#colnames(model_df)[33] <- "host.response.time_within_a_few_hours"
+#colnames(model_df)[34] <- "host.response.time_within_an_hour"
+colnames(model_df)[32] <- "room.type_Hotel_room"
+colnames(model_df)[33] <- "room.type_Private_room"
+colnames(model_df)[34] <- "room.type_Shared_room"
+colnames(model_df)[45] <- "Bathroom.Type_Shared_Batroom"
+```
+
+
+### PATITION DATA: 70% of TRAIN DATA, 30% of TEST DATA
+```{r}
+set.seed(123)
+
+## partitioning into training (70%), validation (30%)
+train.index <- sample(rownames(model_df), dim(model_df)[1]*0.7)  # randomly sample 70% of the row IDs for training
+valid.index <- setdiff(rownames(model_df), train.index)           # use setdiff() to find records not already in the training set
+
+# create the 2 data frames by collecting all columns from the appropriate rows
+train.df <- model_df[train.index, ]
+valid.df <- model_df[valid.index, ]
+
+dim(train.df)
+```
+
+### OVER SAMPLING
+```{r}
+table(train.df$host.is.superhost_t)
+```
+```{r}
+train.df.over<-ovun.sample(host.is.superhost_t~.,data=train.df,method="over",N=32478)$data
+table(train.df.over$host.is.superhost_t)
+```
+
+
+
+### LOGISTIC REGRESSION MODEL
+```{r}
+
+logit_model <- glm(host.is.superhost_t ~ ., data = train.df.over, family = "binomial")
+summary(logit_model)
+
+```
+
+
+### chosen variables: log(price), host_response_rate, host_acceptance_rate, host_total_listings_count, accommodates, number_of_reviews, number_of_reviews_ltm, review_scores_rating, review_scores_location, review_scores_value, reviews_per_month, amenities_count, kitchen, gym, parking, long_term_Stay_allowed, private_entrance, Med_Area_House_Value, Percen_Under_Poverty, host_response_time_within a day, host_response_time_within a few hours, host_response_time_within an hour, instant_bookable_t, Density_Bin_2, Density_Bin_4, Density_Bin_5, Density_Bin_7 , Density_Bin_8, Density_Bin_10, 
+
+### Confusion Matrix
+```{r}
+logit.pred.step <- predict(logit_model, valid.df,type="response")
+confusionMatrix(as.factor(ifelse(logit.pred.step>0.5, 1 ,0)),as.factor(valid.df$host.is.superhost_t),positive = "1")
+```
+
+
+```{r}
+pred_table <- data.frame(matrix(nrow = 9943))
+pred_table$prob <- logit.pred.step
+pred_table$actual <- valid.df$host.is.superhost_t
+pred_table$prediction <- ifelse(logit.pred.step>0.5, 1 ,0)
+
+```
+
+```{r}
+gain <- gains(pred_table$actual, pred_table$prob,)
+b <- barplot(gain$mean.resp / mean(pred_table$actual), names.arg = gain$depth, xlab = "Percentile", col ="cornflowerblue", ylim = c(0,2.8),
+ylab = "Mean Response", main = "Decile-wise lift chart")
+
+#x <- as.data.frame(round(gain$mean.resp / mean(pred_table$actual),2))
+text(x=b, y= round(gain$mean.resp / mean(pred_table$actual),2)+0.15, labels=as.character(round(gain$mean.resp / mean(pred_table$actual),1)))
+```
+```{r}
+x
+```
+
+
+```{r}
+
+gain <- gains(pred_table$actual, pred_table$prob, groups=dim(pred_table)[1])
+plot(c(0, gain$cume.pct.of.total*sum(pred_table$actual)) ~ c(0, gain$cume.obs), col= "blue",
+xlab = "# cases", ylab = "Cumulative", type="l")
+lines(c(0,sum(pred_table$actual))~c(0,dim(pred_table)[1]), col="red", lty=2)
+
+legend(x = "topleft",          # Position
+        inset = c(0.01,0.01),
+       title = "Being a Super-Host",
+       legend = c("by model", "random selection"),  # Legend texts
+       lty = c(1, 2),           # Line types
+       col = c("blue", "red"),           # Line colors
+       lwd = 1)                 # Line width
+```
+
+
+
+```{r}
+coeff_df <- as.data.frame(summary(logit_model)$coefficient)
+coeff_df$Indicators <- rownames(coeff_df)
+sig_coef_df <- coeff_df[coeff_df[,4]<= 0.05, c(5,1,2,3,4)]
+sig_coef_df
+```

@@ -1,0 +1,276 @@
+---
+title: "Visualization"
+author: "Nam Tran"
+date: "3/25/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr); library(tidyverse); library(dplyr); library(psych); library(PerformanceAnalytics); library(skimr); library(lessR); library(ggplot2); library(gridExtra); library(fastDummies); library(forecast); library(BMA); library(stats); library(olsrr); library(MASS); library(kableExtra); library(car); library(broom); library(glmulti); library(ggmap); library(rstudioapi); library(revgeo); library(RCurl);library(stringr); library(gsubfn)
+```
+
+```{r}
+Listing_df <- read.csv("Airbnb_DataCleaning2.csv.csv")
+Hosts_inf <- read.csv("Hosts_information.csv")
+```
+
+# Exploratory Data analysis
+## Hosts Information
+
+```{r}
+#str(Hosts_inf)
+```
+
+### How many super host?
+```{r}
+table(Hosts_inf$host_is_superhost)
+count(Hosts_inf[Hosts_inf$host_is_superhost =="t",])/nrow(Hosts_inf)*100
+```
+Superhosts takes 30% of hosts in LA
+
+### How many host completed verification?
+```{r}
+table(Hosts_inf$host_identity_verified)
+count(Hosts_inf[Hosts_inf$host_identity_verified =="t",])/nrow(Hosts_inf)*100
+```
+More than 78.8% host completed verification in Airbnb
+
+## Listing Dataset
+```{r}
+#str(Listing_df)
+```
+Numerical variable: 
+
+ * "host_response_rate"
+ * "host_acceptance_rate"
+ * "host_total_listings_count"
+ * "price"
+ * "number_of_reviews"
+ * "number_of_reviews_ltm"
+ * "number_of_reviews_l30d"
+ * "review_scores_rating"
+ * "review_scores_accuracy"
+ * "review_scores_cleanliness"
+ * "review_scores_checkin"
+ * "review_scores_communication"
+ * "review_scores_location"
+ * "review_scores_value"
+ * "reviews_per_month"
+ 
+ Categorical Variables: 
+ 
+ * "host_response_time"
+ * "host_is_superhost"
+ * "host_has_profile_pic"
+ * "host_identity_verified"
+ * "neighbourhood_cleansed"
+ * "neighbourhood_group_cleansed"
+ * "property_type"
+ * "room_type"
+ * "accommodates"
+ * "bathrooms_text"
+ * "bedrooms"
+ * "beds"
+ * "amenities"
+ * "instant_bookable"
+ * "Zip"
+ * "City"
+ 
+### Numerical Variables statistic Summary
+```{r}
+num_variales <- c("host_response_rate", "host_acceptance_rate", "host_total_listings_count", "price", "number_of_reviews", "number_of_reviews_ltm", "number_of_reviews_l30d", "review_scores_rating", "review_scores_accuracy", "review_scores_cleanliness", "review_scores_checkin", "review_scores_communication", "review_scores_location",  "review_scores_value", "reviews_per_month")
+Num_sum_stat <- skimr::skim(Listing_df[,num_variales])
+Num_sum_stat
+```
+ 
+### host_response_rate
+```{r}
+Listing_df$host_response_rate[is.na(Listing_df$host_response_rate)== TRUE] = mean(Listing_df$host_response_rate, na.rm = TRUE)
+par(mfrow = c(1,2))
+boxplot(Listing_df$host_response_rate ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Host Response Rate")
+hist(Listing_df$host_response_rate, xlab = "Host Response Rate", main = "Distribution of Host Response Rate")
+
+```
+
+### host_acceptance_rate
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$host_acceptance_rate ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Host Acceptance Rate")
+hist(Listing_df$host_acceptance_rate, xlab = "Host Acceptance Rate", main = "Distribution of Host Acceptance Rate")
+Listing_df$host_acceptance_rate[is.na(Listing_df$host_acceptance_rate)== TRUE] = mean(Listing_df$host_acceptance_rate, na.rm = TRUE)
+```
+The Acceptance Rate of host is quite high, and there range of acceptance rate for SuperHost is significantly narrower than that for Non-SuperHost.
+Based on the distribution, We will replace missing value for acceptance rate by the average of this variable.
+
+### host_total_listings_count
+```{r}
+Hosts_Total_Listing <- as.data.frame(table(Listing_df$host_id))
+colnames(Hosts_Total_Listing) <- c("host_id","total_listing")
+Listing_df <- merge(Listing_df, Hosts_Total_Listing, by = "host_id")
+```
+```{r}
+Listing_df$host_total_listings_count <- Listing_df$total_listing
+Listing_df <- Listing_df[,-c(48)]
+```
+```{r}
+# Using Host information to examine total listings variable
+par(mfrow = c(1,2))
+boxplot(Hosts_inf$total_listing ~ Hosts_inf$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Total Listing", log ='y')
+hist(Hosts_inf$total_listing, xlab = "Total Listing", main = "Distribution of Total Listing")
+count(Hosts_inf[Hosts_inf$host_is_superhost == "t" & Hosts_inf$total_listing > 1,])/count(Hosts_inf[Hosts_inf$host_is_superhost == "t",])
+count(Hosts_inf[Hosts_inf$host_is_superhost == "f" & Hosts_inf$total_listing > 1,])/count(Hosts_inf[Hosts_inf$host_is_superhost == "f",])
+```
+Most of hosts just own only 1 listing, however there are some hosts own more than 1 listing. The distribution range of total listing for SuperHost is wider than that of N0n-SuperHost, nearly 30% of SuperHost own at least 2 listings, while there are 22% Non-SupperHost owing at least 2 listings.
+
+### price
+```{r}
+
+par(mfrow = c(1,2))
+# boxplot(Listing_df[Listing_df$price < 3000,"price"] ~ Listing_df[Listing_df$price < 3000,"host_is_superhost"], xlab = "Host is SuperHost or not", ylab = "Price", log = "y")
+boxplot(Listing_df$price  ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Price", log ="y")
+hist(Listing_df$price, xlab = "Price", main = "Distribution of Price")
+```
+
+### number_of_reviews
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$number_of_reviews ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Number of Review")
+hist(Listing_df$number_of_reviews, xlab = "Number of Review", main = "Distribution of Number of Review")
+mean(Listing_df$number_of_reviews[Listing_df$host_is_superhost == 't'])
+mean(Listing_df$number_of_reviews[Listing_df$host_is_superhost == 'f'])
+```
+Most of listings received less than 200 reviews. From the box plot, Listings of SuperHost received more reviews than Non-SuperHost do. Listings of SuperHost have 75 reviews on average, while Listings of Non-SuperHost have 30 reviews on average.
+
+### number_of_reviews_ltm (the number of review the listings had in 12 months)
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$number_of_reviews_ltm[Listing_df$number_of_reviews_ltm<200] ~ Listing_df$host_is_superhost[Listing_df$number_of_reviews_ltm<200] , 
+        xlab = "Host is SuperHost or not", ylab = "Number of Review in last 12 months")
+hist(Listing_df$number_of_reviews_ltm, xlab = "Number of Review in last year", main = "Distribution of Number of Review")
+mean(Listing_df$number_of_reviews_ltm[Listing_df$host_is_superhost == 't'])
+mean(Listing_df$number_of_reviews_ltm[Listing_df$host_is_superhost == 'f'])
+```
+Similarly, we could see that listings of Non-SuperHost have fewer reviews than SuperHosts. Listing of Non-superHost have 6 reviews on average inlast 12 months, while that of SuperHost is 17 reviews.
+
+### review_scores_rating
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$review_scores_rating ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Review Score Rate")
+hist(Listing_df$review_scores_rating, xlab = "Review Score", main = "Distribution of Review Score")
+mean(Listing_df$review_scores_rating[Listing_df$host_is_superhost == 't'])
+mean(Listing_df$review_scores_rating[Listing_df$host_is_superhost == 'f'])
+```
+Listings of SuperHost have higher review Score, around 4.88, while that of Non-SuperHost is 4.6
+
+### review_scores_accuracy
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$review_scores_accuracy ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Score of Accuracy")
+hist(Listing_df$review_scores_accuracy, xlab = "Score of Accuracy", main = "Distribution of Score Accuracy")
+mean(Listing_df$review_scores_accuracy[Listing_df$host_is_superhost == 't'])
+mean(Listing_df$review_scores_accuracy[Listing_df$host_is_superhost == 'f'])
+```
+The averavege accuracy score of SuperHost is higher than that of Non-SuperHost
+
+### review_scores_cleanliness
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$review_scores_cleanliness ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Score of Cleanliess")
+hist(Listing_df$review_scores_cleanliness, xlab = "Score of Cleanliness", main = "Distribution of Score Cleanliness")
+mean(Listing_df$review_scores_cleanliness[Listing_df$host_is_superhost == 't'])
+mean(Listing_df$review_scores_cleanliness[Listing_df$host_is_superhost == 'f'])
+```
+Similarly, we could see that usually the scores of cleanliness of SuperHost are higher than that of Non-SuperHost
+
+### review_scores_checkin
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$review_scores_checkin ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Score of Check In")
+hist(Listing_df$review_scores_checkin, xlab = "Score of Cleanliness", main = "Distribution of Score Check In")
+mean(Listing_df$review_scores_checkin[Listing_df$host_is_superhost == 't'])
+mean(Listing_df$review_scores_checkin[Listing_df$host_is_superhost == 'f'])
+```
+
+### review_scores_communication
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$review_scores_communication ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Score of Communication")
+hist(Listing_df$review_scores_communication, xlab = "Score of Communication", main = "Distribution of Score Communication")
+mean(Listing_df$review_scores_communication[Listing_df$host_is_superhost == 't'])
+mean(Listing_df$review_scores_communication[Listing_df$host_is_superhost == 'f'])
+```
+
+### review_scores_location
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$review_scores_location ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Score of Location")
+hist(Listing_df$review_scores_location, xlab = "Score of Location", main = "Distribution of Score Location")
+mean(Listing_df$review_scores_location[Listing_df$host_is_superhost == 't'])
+mean(Listing_df$review_scores_location[Listing_df$host_is_superhost == 'f'])
+```
+
+### review_scores_value
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$review_scores_value ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Score of Value")
+hist(Listing_df$review_scores_value, xlab = "Score of Value", main = "Distribution of Score Value")
+mean(Listing_df$review_scores_value[Listing_df$host_is_superhost == 't'])
+mean(Listing_df$review_scores_value[Listing_df$host_is_superhost == 'f'])
+```
+Overall, listings of SuperHost has higher review score of Non-superHost in every aspects (accuracy, cleanliness, checkin, communication, location, value)
+
+### reviews_per_month
+```{r}
+par(mfrow = c(1,2))
+boxplot(Listing_df$reviews_per_month ~ Listing_df$host_is_superhost, xlab = "Host is SuperHost or not", ylab = "Review per month", log ="y")
+hist(Listing_df$reviews_per_month, xlab = "Reviews per month", main = "Review per Month")
+mean(Listing_df$reviews_per_month[Listing_df$host_is_superhost == 't'])
+mean(Listing_df$reviews_per_month[Listing_df$host_is_superhost == 'f'])
+```
+### Correllation Matrix
+```{r}
+num_variales2 <- c("host_response_rate", "host_acceptance_rate", "host_total_listings_count", "price", "number_of_reviews", "number_of_reviews_ltm", "review_scores_rating", "review_scores_accuracy", "review_scores_cleanliness", "review_scores_checkin", "review_scores_communication", "review_scores_location",  "review_scores_value", "reviews_per_month")
+round(cor(Listing_df[,num_variales2]),3)
+```
+From the correllation Matrix, there a strong positive relation between review scores variables.
+
+### Categorical Variables Exploratory
+```{r}
+Cat_Variables <- c("host_response_time", "host_is_superhost", "host_has_profile_pic", "host_identity_verified", "neighbourhood_cleansed", "neighbourhood_group_cleansed", "property_type", "room_type","accommodates", "bathrooms_text" , "bedrooms", "beds", "amenities", "instant_bookable", "Zip", "City")
+```
+
+### host_response_time
+```{r}
+# host_response_time has a strong relationship with host_response_rate, therefore we will not consider host_response_time in our models.
+
+Response_time.Plot1 <- ggplot(Listing_df[Listing_df$host_response_time !="N/A",], aes(x = host_response_time, fill = host_is_superhost)) + 
+  geom_bar(position = "dodge") + labs(y="Count of Response Time",title="SuperHost and Non-SuperHost by Response Rate")
+
+Response_time.Plot2 <-ggplot(Listing_df[Listing_df$host_response_time !="N/A",], aes(x = host_response_time, y = length(host_is_superhost), fill = host_is_superhost)) + 
+  geom_col(position = "fill")  
+#Proportion between YES and NO
+Response_time.Plot1 
+Response_time.Plot2 
+```
+### host_has_profile_pic
+```{r}
+Listing_df$host_has_profile_pic[Listing_df$host_has_profile_pic == ""] = "t"
+table(Listing_df$host_has_profile_pic)
+```
+```{r}
+Profile_Pic_time.Plot1 <- ggplot(Listing_df, aes(x = host_has_profile_pic, fill = host_is_superhost)) + 
+  geom_bar(position = "dodge") + labs(y="Count of Host has profile picture",title="SuperHost and Non-SuperHost by Profile picture")
+Profile_Pic_time.Plot1
+```
+We could see that all SuperHosts show their profile picture, which build the trust to their customers. Most 
+
+
+
+```{r}
+# We don't consider the effects of number of review in last 30 days because 30 days is sort period and that is depended on the time that data is collected.
+# host_response_time has a strong relationship with host_response_rate, therefore we will not consider host_response_time in our models.
+# host_has_profile_pic will be not considered in the model.
+```
+
+
