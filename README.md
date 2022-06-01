@@ -2,6 +2,7 @@
 *Evaluation system and recommendations for new hosts penetrating hospitality market.
 - Processed data of 120,000 records of listings and built a model to reveal the feature set affecting superhost recognition, helping increase booking rate and improve customer experience.
 - Implemented explanatory analysis and machine learning model to detect the reason for revocation of the Super-host title (accuracy 73%)
+
 *Applied text mining and sentiment analysis on more than 1 million reviews to discover customers’ considerations when staying in an Airbnb, resulting in suggestions for increasing rating scores.
 
 1. AIRBNB SUPERHOST OVERVIEW
