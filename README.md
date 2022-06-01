@@ -3,8 +3,6 @@
 - Processed data of 120,000 records of listings and built a model to reveal the feature set affecting superhost recognition, helping increase booking rate and improve customer experience.
 - Implemented explanatory analysis and machine learning model to detect the reason for revocation of the Super-host title (accuracy 73%)
 
-*Applied text mining and sentiment analysis on more than 1 million reviews to discover customers’ considerations when staying in an Airbnb, resulting in suggestions for increasing rating scores.
-
 1. AIRBNB SUPERHOST OVERVIEW
 
 - Every 3 months, Airbnb evaluate host performance and check whether a host hit all the requirements within the past year to become Superhost. If a host satisfies the performance standards and other qualifications for the most recent 12 months from the review date, then the host is automatically eligible to become a Superhost for the qualification period. (For example, if the review date is on July 1, 2014, then a host’s performance from the most recent previous 12 months from July 1, 2014 is measured.)
